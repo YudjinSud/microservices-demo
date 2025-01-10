@@ -15,10 +15,41 @@
 # limitations under the License.
 
 import random
-from locust import FastHttpUser, TaskSet, between
+from locust import FastHttpUser, TaskSet, between, events
+import csv
+from datetime import datetime
+import os
 from faker import Faker
 import datetime
+
 fake = Faker()
+
+# Add metrics collection
+@events.test_start.add_listener
+def on_test_start(environment, **kwargs):
+    if environment.web_ui:
+        # Create results directory if it doesn't exist
+        if not os.path.exists("results"):
+            os.makedirs("results")
+        
+        # Initialize CSV with headers
+        filename = f"results/loadtest_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        with open(filename, "w") as f:
+            writer = csv.writer(f)
+            writer.writerow(["timestamp", "request_type", "response_time", "success"])
+
+@events.request.add_listener
+def on_request(request_type, name, response_time, response_length, exception, **kwargs):
+    # Log each request to CSV
+    if hasattr(events, "csv_filename"):
+        with open(events.csv_filename, "a") as f:
+            writer = csv.writer(f)
+            writer.writerow([
+                datetime.datetime.now().isoformat(),
+                request_type,
+                response_time,
+                exception is None
+            ])
 
 products = [
     '0PUK6V6EV0',

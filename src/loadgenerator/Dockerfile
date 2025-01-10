@@ -26,10 +26,24 @@ WORKDIR /loadgen
 
 COPY --from=builder /install /usr/local
 
-# Add application code.
+# Add application code
 COPY locustfile.py .
+
+# Create directory for results
+RUN mkdir -p /loadgen/results
 
 # enable gevent support in debugger
 ENV GEVENT_SUPPORT=True
 
-ENTRYPOINT locust --host="http://${FRONTEND_ADDR}" --headless -u "${USERS:-10}" -r "${RATE:-1}" 2>&1
+# Default to worker mode, can be overridden
+ENV LOCUST_MODE=worker
+ENV LOCUST_MASTER_HOST=localhost
+ENV LOCUST_MASTER_PORT=5557
+
+ENTRYPOINT if [ "$LOCUST_MODE" = "master" ]; then \
+    locust --master --host="http://${FRONTEND_ADDR}" --web-port=8089; \
+  elif [ "$LOCUST_MODE" = "worker" ]; then \
+    locust --worker --master-host=${LOCUST_MASTER_HOST} --master-port=${LOCUST_MASTER_PORT} --host="http://${FRONTEND_ADDR}"; \
+  else \
+    locust --host="http://${FRONTEND_ADDR}" --headless -u "${USERS:-10}"; \
+  fi
